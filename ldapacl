@@ -1,0 +1,14 @@
+#!/bin/bash
+# a tool for querying OpenLDAP ACLs
+
+usage() {
+    echo "${0/*\/} [ldapsearch(1) options]"
+}
+
+case $1 in
+    --help|-h|-? )
+        usage
+        exit 1
+esac
+
+ldapsearch $@ -o ldif-wrap=no -b cn=config olcaccess=* olcsuffix olcaccess olcrootdn | sed 's/ by /\n  by /g'
