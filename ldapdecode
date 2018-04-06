@@ -1,0 +1,17 @@
+#!/bin/bash
+# a tool for decoding base64 encoded LDAP attributes
+# USE WITH CAUTION; Not all attributes base64 encoded should be decoded by this program.
+# This program was primarly created to interact with the userPassword attribute.
+
+usage() {
+    echo "${0/*\/} [ldapsearch(1) options]"
+}
+
+case $1 in
+    --help|-\? )
+        usage
+        exit 1
+    ;;
+esac
+
+ldapsearch -o ldif-wrap=no $@ | sed -r 's/([^:]+:): (.+)/echo -n "\1 "; (echo \2 | base64 -d)/e;'
