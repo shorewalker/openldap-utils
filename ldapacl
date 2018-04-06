@@ -6,7 +6,7 @@ usage() {
 }
 
 case $1 in
-    --help|-h|-? )
+    --help|-? )
         usage
         exit 1
 esac
