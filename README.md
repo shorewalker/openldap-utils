@@ -5,5 +5,7 @@ a small tool(set) for OpenLDAP
 
 ---
 installation:  
-`curl https://github.com/voxnil/openldap-utils.git`  
-`sudo make install`  
+
+    git clone https://github.com/voxnil/openldap-utils.git
+    cd openldap-utils
+    sudo make install  
