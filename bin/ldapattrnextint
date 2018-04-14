@@ -1,0 +1,87 @@
+#!/bin/bash
+# a tool for finding the next free base10 integer value for an attribute
+# This program was primarily created to interact with uidNumber and gidNumber
+
+usage() {
+    echo "${0/*\/} -m <min int value> [-A <attr>] [ldapsearch(1) options]"
+}
+
+case $1 in
+    --help|-\? )
+        usage
+        exit 1
+    ;;
+esac
+
+function processArgs {
+    while (( $# )) ; do
+        case $1 in
+            -m )
+                attrvaluemin=$2
+                shift;shift;;
+            -A )
+                if [ $# -lt 2 ]; then
+                    usage >&2
+                    exit 1
+                fi
+                attrs+=($2)
+                shift;shift;;
+            * )
+                ldapsearchargs+=($1)
+                shift;;
+            esac
+     done
+}
+
+
+processArgs $@
+
+if [ ! -z $attrvaluemin ] ; then
+    case ${attrvaluemin#[-+]} in
+        *[!0-9]* | '')
+            usage >&2
+            exit 1
+            ;;
+        * )
+        ;;
+    esac
+else
+    usage >&2
+    exit 1
+fi
+
+[ -z $ldapfilter ] && ldapfilter="(|"
+#sedfilter="/^\$/d;/dn:/d;"
+for attr in ${attrs[*]}; do
+        ldapfilter+="($attr>=$attrvaluemin)"
+#        sedfilter+="s/^$attr: //;"
+done
+ldapfilter+=")"
+sedfilter="/^\$/d;/dn:/d;s/.+:[^ ]* //"
+
+if [ ${#attrs[*]} -eq 1 ]; then
+    ldapsortattr=$attr
+fi
+
+attrvalues=$( ( ldapsearch -o ldif-wrap=no -LLL ${ldapsortattr+-S $ldapsortattr} ${ldapfilter/(\|)/} ${ldapsearchargs[*]} ${attrs[*]} ) | sed -r "$sedfilter" | sort -ug )
+
+for attrvalue in $attrvalues ; do
+        if [ -z "${attrvalue##*[!0-9]*}" ]; then
+            echo $attrvalue is not a integer
+            exit 1
+        fi
+        ## If the value is greater than the minium value by one, increase the minium value.
+        ## Else, if the value is less than the minium value, do nothing.
+        ## Otherwise return one more than the previous minium.
+        ##
+        ## (( value == min+1 ) && ( value > min ))
+        if [ $attrvalue -eq $(( $attrvaluemin + 1 )) -a $attrvalue -gt $attrvaluemin ]; then
+            attrvaluemin=$attrvalue
+        elif [ $attrvalue -le $attrvaluemin ] ; then
+            continue
+        else
+            attrvaluemin=$(( $attrvaluemin + 1 ))
+            break
+        fi
+done
+echo $attrvaluemin
