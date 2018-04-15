@@ -1,7 +1,8 @@
 # openldap-utils
-a small tool(set) for OpenLDAP 
+a small toolset for OpenLDAP 
 - ldapacl - a tool for querying OpenLDAP ACLs
 - ldapdecode - a tool for decoding base64 encoded LDAP attributes
+- ldapattrnextint - a tool for finding the next free base10 integer value for a set of attributes
 
 ---
 installation:  

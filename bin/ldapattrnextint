@@ -2,10 +2,6 @@
 # a tool for finding the next free base10 integer value for an attribute
 # This program was primarily created to interact with uidNumber and gidNumber
 
-usage() {
-    echo "${0/*\/} -m <min int value> [-A <attr>] [ldapsearch(1) options]"
-}
-
 case $1 in
     --help|-\? )
         usage
@@ -13,11 +9,28 @@ case $1 in
     ;;
 esac
 
+usage() {
+    echo "${0/*\/} --start <int> --end <int> [--increment <int=1>] [-A <attr>] [ldapsearch(1) options]"
+}
+
 function processArgs {
     while (( $# )) ; do
         case $1 in
-            -m )
-                attrvaluemin=$2
+            --start )
+                if [ $# -lt 2 ]; then
+                    usage >&2
+                    exit 1
+                fi
+                isInt $2 assert
+                attrvaluereturn=$2
+                shift;shift;;
+            --end )
+                if [ $# -lt 2 ]; then
+                    usage >&2
+                    exit 1
+                fi
+                isInt $2 assert
+                attrvaluelimit=$2
                 shift;shift;;
             -A )
                 if [ $# -lt 2 ]; then
@@ -26,6 +39,18 @@ function processArgs {
                 fi
                 attrs+=($2)
                 shift;shift;;
+            --increment|--inc )
+                if [ $# -lt 2 ]; then
+                    usage >&2
+                    exit 1
+                fi
+                isInt $2 assert
+                if [ $2 -eq 0 ]; then
+                    echo Increment should not be 0.
+                    exit 1
+                fi 
+                increment=$2
+                shift;shift;;
             * )
                 ldapsearchargs+=($1)
                 shift;;
@@ -33,55 +58,83 @@ function processArgs {
      done
 }
 
-
-processArgs $@
-
-if [ ! -z $attrvaluemin ] ; then
-    case ${attrvaluemin#[-+]} in
+function isInt {
+    case ${1#[-+]} in
         *[!0-9]* | '')
-            usage >&2
-            exit 1
+            if [ $2 == "assert" ] ; then
+                echo $1 is not an int. >&2
+                exit 1
+            fi
+            return 1
             ;;
         * )
-        ;;
-    esac
-else
-    usage >&2
+            return 0
+            ;;
+    esac  
+}
+
+processArgs $@
+if [ -z $attrvaluereturn ] ; then
+    usage 2>&1;
     exit 1
+fi
+if [ -z $attrvaluelimit ] ; then
+    usage 2>&1;
+    exit 1
+fi
+if [ -z $increment ] ; then
+    increment=1
 fi
 
 [ -z $ldapfilter ] && ldapfilter="(|"
 #sedfilter="/^\$/d;/dn:/d;"
 for attr in ${attrs[*]}; do
-        ldapfilter+="($attr>=$attrvaluemin)"
+    if [ $increment -gt 0 ] ; then
+        ldapfilter+="($attr>=$attrvaluereturn)"
+    else
+        ldapfilter+="($attr<=$attrvaluereturn)"
+    fi
 #        sedfilter+="s/^$attr: //;"
 done
 ldapfilter+=")"
 sedfilter="/^\$/d;/dn:/d;s/.+:[^ ]* //"
 
 if [ ${#attrs[*]} -eq 1 ]; then
-    ldapsortattr=$attr
+    ldapsortattr=${attrs[*]}
 fi
 
-attrvalues=$( ( ldapsearch -o ldif-wrap=no -LLL ${ldapsortattr+-S $ldapsortattr} ${ldapfilter/(\|)/} ${ldapsearchargs[*]} ${attrs[*]} ) | sed -r "$sedfilter" | sort -ug )
+attrvalues=$( ( ldapsearch -o ldif-wrap=no -LLL ${ldapsortattr+-S $ldapsortattr} ${ldapfilter/(\|)/} ${ldapsearchargs[*]} ${attrs[*]} ) | sed -r "$sedfilter" )
+if [ $increment -gt 0 ]; then
+    attrvalues=$( echo "$attrvalues" | sort -ug )
+else
+    attrvalues=$( echo "$attrvalues" | sort -ugr )
+fi
 
-for attrvalue in $attrvalues ; do
-        if [ -z "${attrvalue##*[!0-9]*}" ]; then
-            echo $attrvalue is not a integer
-            exit 1
-        fi
-        ## If the value is greater than the minium value by one, increase the minium value.
-        ## Else, if the value is less than the minium value, do nothing.
-        ## Otherwise return one more than the previous minium.
-        ##
-        ## (( value == min+1 ) && ( value > min ))
-        if [ $attrvalue -eq $(( $attrvaluemin + 1 )) -a $attrvalue -gt $attrvaluemin ]; then
-            attrvaluemin=$attrvalue
-        elif [ $attrvalue -le $attrvaluemin ] ; then
-            continue
-        else
-            attrvaluemin=$(( $attrvaluemin + 1 ))
-            break
-        fi
-done
-echo $attrvaluemin
+if [ $increment -gt 0 ]; then
+    for attrvalue in $attrvalues ; do
+            isInt $attrvalue assert
+            if [ $attrvalue -lt $attrvaluereturn ]; then
+                continue
+            elif [ $attrvalue -eq $attrvaluereturn ]; then
+                attrvaluereturn=$(( $attrvaluereturn + $increment ))
+            elif [ $attrvalue -gt $attrvaluelimit ] ; then
+                exit 3
+            elif [ $attrvalue -gt $attrvaluereturn ] ; then
+                break
+            fi
+    done
+else
+    for attrvalue in $attrvalues ; do
+            isInt $attrvalue assert
+            if [ $attrvalue -gt $attrvaluereturn ] ; then
+                continue
+            elif [ $attrvalue -eq $attrvaluereturn ]; then
+                attrvaluereturn=$(( $attrvaluereturn + $increment ))
+            elif [ $attrvalue -lt $attrvaluelimit ] ; then
+                exit 3
+            elif [ $attrvalue -lt $attrvaluereturn ]; then
+                break
+            fi
+    done
+fi
+echo $attrvaluereturn
