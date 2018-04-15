@@ -1,0 +1,5 @@
+#!/bin/bash
+# a trival tool for converting time into ldap format
+
+date=$@
+date --date="$date" +%Y%m%d%H%M%SZ
