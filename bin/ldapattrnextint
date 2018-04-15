@@ -5,32 +5,65 @@
 case $1 in
     --help|-\? )
         usage
-        exit 1
-    ;;
+        ;;
 esac
 
 usage() {
-    echo "${0/*\/} --start <int> --end <int> [--increment <int=1>] [-A <attr>] [ldapsearch(1) options]"
+    echo "${0/*\/} --range <start>..<end>[..<step>] [-A <attr>] [ldapsearch(1) options]"
 }
 
 function processArgs {
     while (( $# )) ; do
         case $1 in
-            --start )
+            --range|-r )
                 if [ $# -lt 2 ]; then
                     usage >&2
                     exit 1
                 fi
-                isInt $2 assert
-                attrvaluereturn=$2
-                shift;shift;;
-            --end )
-                if [ $# -lt 2 ]; then
-                    usage >&2
-                    exit 1
+                oldIFS=$IFS
+                IFS=".."
+                read -r attrvaluereturn spacer attrvaluelimit spacer increment <<< $2
+                unset spacer
+                IFS=$oldIFS
+                isInt $attrvaluereturn assert
+                isInt $attrvaluelimit assert
+                if [ $attrvaluereturn -eq $attrvaluelimit ]; then
+                    if [ -z $increment ] ; then
+                        increment=0
+                    else
+                        isInt $increment assert
+                        if [ $increment -ne 0 ]; then
+                            echo "<step> should not be $increment for range $attrvaluereturn..$attrvaluelimit" >&2
+                            exit 1
+                        fi
+                    fi
                 fi
-                isInt $2 assert
-                attrvaluelimit=$2
+                if [ $attrvaluereturn -lt $attrvaluelimit ]; then
+                    if [ -z $increment ] ; then
+                        increment=1
+                    else
+                        isInt $increment assert
+                        if [ $increment -eq 0 ]; then
+                            echo "<step> should not be $increment for range $attrvaluereturn..$attrvaluelimit" >&2
+                            exit 1
+                        elif [ $increment -lt 0 ]; then
+                            increment=${increment#-}
+                        fi
+                    fi
+                fi
+                if [ $attrvaluelimit -lt $attrvaluereturn ]; then
+                    if [ -z $increment ] ; then
+                        increment=-1
+                    else
+                        isInt $increment assert
+                        if [ $increment -eq 0 ]; then
+                            echo "<step> should not be $increment for range $attrvaluereturn..$attrvaluelimit" >&2
+                            exit 1
+                        elif [ $increment -gt 0 ]; then
+                            increment=-$increment
+                        fi
+                    fi
+                fi
                 shift;shift;;
             -A )
                 if [ $# -lt 2 ]; then
@@ -38,18 +71,6 @@ function processArgs {
                     exit 1
                 fi
                 attrs+=($2)
-                shift;shift;;
-            --increment|--inc )
-                if [ $# -lt 2 ]; then
-                    usage >&2
-                    exit 1
-                fi
-                isInt $2 assert
-                if [ $2 -eq 0 ]; then
-                    echo Increment should not be 0.
-                    exit 1
-                fi 
-                increment=$2
                 shift;shift;;
             * )
                 ldapsearchargs+=($1)
@@ -60,8 +81,12 @@ function processArgs {
 
 function isInt {
     case ${1#[-+]} in
-        *[!0-9]* | '')
-            if [ $2 == "assert" ] ; then
+        assert )
+            usage >&2
+            exit 1
+            ;;
+        *[!0-9]* |  '')
+            if [ ! -z $2 ] && [ $2 == "assert" ] ; then
                 echo $1 is not an int. >&2
                 exit 1
             fi
@@ -74,27 +99,20 @@ function isInt {
 }
 
 processArgs $@
-if [ -z $attrvaluereturn ] ; then
-    usage 2>&1;
-    exit 1
-fi
-if [ -z $attrvaluelimit ] ; then
-    usage 2>&1;
-    exit 1
-fi
-if [ -z $increment ] ; then
-    increment=1
-fi
+
+#echo return $attrvaluereturn
+#echo limit $attrvaluelimit
+#echo increment $increment 
 
 [ -z $ldapfilter ] && ldapfilter="(|"
 #sedfilter="/^\$/d;/dn:/d;"
 for attr in ${attrs[*]}; do
     if [ $increment -gt 0 ] ; then
-        ldapfilter+="($attr>=$attrvaluereturn)"
+        ldapfilter+="(&($attr>=$attrvaluereturn)($attr<=$attrvaluelimit))"
     else
-        ldapfilter+="($attr<=$attrvaluereturn)"
+        ldapfilter+="(&($attr<=$attrvaluereturn)($attr>=$attrvaluelimit))"
     fi
-#        sedfilter+="s/^$attr: //;"
+    #sedfilter+="s/^$attr: //;"
 done
 ldapfilter+=")"
 sedfilter="/^\$/d;/dn:/d;s/.+:[^ ]* //"
@@ -103,14 +121,17 @@ if [ ${#attrs[*]} -eq 1 ]; then
     ldapsortattr=${attrs[*]}
 fi
 
-attrvalues=$( ( ldapsearch -o ldif-wrap=no -LLL ${ldapsortattr+-S $ldapsortattr} ${ldapfilter/(\|)/} ${ldapsearchargs[*]} ${attrs[*]} ) | sed -r "$sedfilter" )
-if [ $increment -gt 0 ]; then
-    attrvalues=$( echo "$attrvalues" | sort -ug )
-else
-    attrvalues=$( echo "$attrvalues" | sort -ugr )
-fi
+attrvalues=$( ldapsearch -o ldif-wrap=no -LLL ${ldapsortattr+-S $ldapsortattr} ${ldapfilter/(\|)/} ${ldapsearchargs[*]} ${attrs[*]} | sed -r "$sedfilter" )
 
-if [ $increment -gt 0 ]; then
+if [ $increment -eq 0 ]; then
+    if [ -z "$attrvalues" ]; then
+        echo $attrvaluereturn
+        exit
+    else
+        exit 3
+    fi
+elif [ $increment -gt 0 ]; then
+    attrvalues=$( echo "$attrvalues" | sort -ug )
     for attrvalue in $attrvalues ; do
             isInt $attrvalue assert
             if [ $attrvalue -lt $attrvaluereturn ]; then
@@ -124,6 +145,7 @@ if [ $increment -gt 0 ]; then
             fi
     done
 else
+    attrvalues=$( echo "$attrvalues" | sort -ugr )
     for attrvalue in $attrvalues ; do
             isInt $attrvalue assert
             if [ $attrvalue -gt $attrvaluereturn ] ; then
