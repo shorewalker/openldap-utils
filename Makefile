@@ -8,3 +8,10 @@ install:
 	install bin/ldapattrvalues $(bindir)
 	install bin/ldapattrnextint $(bindir)
 	install bin/ldapdate $(bindir)
+
+uninstall:
+	rm $(bindir)/ldapacl
+	rm $(bindir)/ldapdecode
+	rm $(bindir)/ldapattrvalues
+	rm $(bindir)/ldapattrnextint
+	rm $(bindir)/ldapdate
