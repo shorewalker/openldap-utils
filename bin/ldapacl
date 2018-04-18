@@ -2,13 +2,29 @@
 # a tool for querying OpenLDAP ACLs
 
 usage() {
-    echo "${0/*\/} [ldapsearch(1) options]"
+    echo "${0/*\/} [--suffix <suffix>] [ldapsearch(1) options]"
 }
 
-case $1 in
-    --help|-\? )
-        usage
-        exit 1
-esac
+function processArgs {
+    while (( $# )) ; do
+        case $1 in
+            --help|-\? )
+                usage
+                exit;;
+            --suffix )
+                ldapfilter="olcSuffix=$2"
+                shift;shift;;
+            * )
+                ldapsearchargs+=($1)
+                shift;;
+        esac
+    done
+}
 
-ldapsearch $@ -o ldif-wrap=no -b cn=config olcaccess=* olcsuffix olcaccess olcrootdn | sed 's/ by /\n  by /g'
+processArgs $@
+
+if [ -z $ldapfilter ]; then
+    ldapfilter="objectclass=olcDatabaseConfig"
+fi
+
+ldapsearch -o ldif-wrap=no -b cn=config $ldapfilter ${ldapsearchargs[*]} olcsuffix olcaccess olcrootdn | sed 's/ by /\n  by /g'
