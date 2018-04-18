@@ -10,8 +10,7 @@ usage() {
 case $1 in
     --help|-\? )
         usage
-        exit 1
-    ;;
+        exit;;
 esac
 
 ldapsearch -o ldif-wrap=no $@ | sed -r 's/([^:]+:): (.+)/echo -n "\1 "; (echo \2 | base64 -d)/e;'
