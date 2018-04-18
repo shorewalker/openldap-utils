@@ -2,12 +2,6 @@
 # a tool for finding the next free base10 integer value for an attribute
 # This program was primarily created to interact with uidNumber and gidNumber
 
-case $1 in
-    --help|-\? )
-        usage
-        ;;
-esac
-
 usage() {
     echo "${0/*\/} --range <start>..<end>[..<step>] [-A <attr>] [ldapsearch(1) options]"
 }
@@ -15,6 +9,9 @@ usage() {
 function processArgs {
     while (( $# )) ; do
         case $1 in
+            --help|-\? )
+                usage
+                exit;;
             --range|-r )
                 if [ $# -lt 2 ]; then
                     usage >&2
