@@ -3,7 +3,8 @@ a small toolset for OpenLDAP
 ## Overview
 - `ldapacl` - a tool for querying OpenLDAP ACLs
 - `ldapdecode` - a tool for decoding base64 encoded LDAP attributes
-- `ldapattrnextint` - a tool for finding the next free base10 integer value for a set of attributes
+- `ldapattrsvalues` - a tool for returning attribue values (and only attribute values) of an LDAP query 
+- `ldapattrsnextint` - a tool for finding the next free base10 integer value for a set of attributes
 - `ldapdate` - a trivial tool for converting time into ldap format
 ## Dependencies
 `openldap-clients`  

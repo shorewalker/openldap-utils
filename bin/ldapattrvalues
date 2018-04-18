@@ -1,0 +1,45 @@
+#!/bin/bash
+# a tool for returning attribue values (and only attribute values) of an LDAP query
+
+usage() {
+    echo "${0/*\/} [-A <attr>] [ldapsearch(1) options]"
+}
+
+function processArgs {
+    while (( $# )) ; do
+        case $1 in
+            -A )
+                if [ $# -lt 2 ]; then
+                    usage >&2
+                    exit 1
+                fi
+                attrs+=($2)
+                shift;shift;;
+            * )
+                ldapsearchargs+=($1)
+                shift;;
+            --help|-\? )
+                usage
+            ;;
+          esac
+     done
+}
+
+processArgs $@
+
+[ -z $ldapfilter ] && ldapfilter="(|"
+#sedfilter="/^\$/d;/dn:/d;"
+for attr in ${attrs[*]}; do
+    if [ $increment -gt 0 ] ; then
+        ldapfilter+="(&($attr>=$attrvaluereturn)($attr<=$attrvaluelimit))"
+    else
+        ldapfilter+="(&($attr<=$attrvaluereturn)($attr>=$attrvaluelimit))"
+    fi
+    #sedfilter+="s/^$attr: //;"
+done
+ldapfilter+=")"
+sedfilter="/^\$/d;/dn:/d;s/.+:[^ ]* //"
+
+attrvalues=$( ldapsearch -o ldif-wrap=no -LLL ${ldapsortattr+-S $ldapsortattr} ${ldapfilter/(\|)/} ${ldapsearchargs[*]} ${attrs[*]} | sed -r "$sedfilter" )
+
+echo "$attrvaluereturn"
