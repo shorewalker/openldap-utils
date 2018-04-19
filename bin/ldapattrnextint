@@ -110,10 +110,6 @@ if [ -z $increment ]; then
     exit 1
 fi
 
-echo return $attrvaluereturn
-echo limit $attrvaluelimit
-echo increment $increment 
-
 [ -z $ldapfilter ] && ldapfilter="(|"
 #sedfilter="/^\$/d;/dn:/d;"
 for attr in ${attrs[*]}; do
