@@ -97,9 +97,22 @@ function isInt {
 
 processArgs $@
 
-#echo return $attrvaluereturn
-#echo limit $attrvaluelimit
-#echo increment $increment 
+if [ -z $attrvaluereturn ]; then
+    usage >&2
+    exit 1
+fi
+if [ -z $attrvaluelimit ]; then
+    usage >&2
+    exit 1
+fi
+if [ -z $increment ]; then
+    usage >&2
+    exit 1
+fi
+
+echo return $attrvaluereturn
+echo limit $attrvaluelimit
+echo increment $increment 
 
 [ -z $ldapfilter ] && ldapfilter="(|"
 #sedfilter="/^\$/d;/dn:/d;"
