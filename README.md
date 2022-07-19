@@ -13,7 +13,7 @@ a small toolset for OpenLDAP
 `coreutils`  
 ## Installation
 ```
-git clone https://github.com/voxnil/openldap-utils.git
+git clone https://github.com/shorewalker/openldap-utils.git
 cd openldap-utils
 sudo make install
 ```
