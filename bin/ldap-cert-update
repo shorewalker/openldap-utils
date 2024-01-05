@@ -13,7 +13,7 @@ fi
 certname=$1
 
 if [ -f /etc/openldap/certs/$certname/chain.pem -a -f /etc/openldap/certs/$certname/cert.pem -a -f /etc/openldap/certs/$certname/privkey.pem ]; then
-grep -v -e modify -e ^$ <( ldapmodify -Q <<EOF
+ldapmodify -Q <<EOF
 dn: cn=config
 delete: olcTLSCACertificateFile
 -
@@ -31,7 +31,6 @@ add: olcTLSCertificateKeyFile
 olcTLSCertificateKeyFile: /etc/openldap/certs/$certname/privkey.pem
 -
 EOF
-)
 fi
 
 exit 0
